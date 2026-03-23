@@ -323,8 +323,8 @@ class AlphaEngine(Engine):
 
                 # Inject tool-returned guidelines (including those emitted by
                 # retrievers during on_generating_messages) and re-apply
-                # priority filtering.
-                self._inject_transient_guidelines(context)
+                # relational resolution.
+                await self._inject_transient_guidelines(context)
 
                 # Call on_match handlers for all matched guidelines (before generating messages)
                 await self._call_guideline_handlers(
@@ -1945,27 +1945,25 @@ class AlphaEngine(Engine):
             utterance_request_to_match(i, request) for i, request in enumerate(requests, start=1)
         ]
 
-    def _inject_transient_guidelines(self, context: EngineContext) -> None:
+    async def _inject_transient_guidelines(self, context: EngineContext) -> None:
         """Extract transient guidelines from tool results, inject them as ordinary
-        guideline matches, and re-apply priority filtering on the combined set."""
+        guideline matches, and re-apply relational resolution on the combined set."""
         tool_guideline_matches = self._extract_guidelines_from_tool_results(
             context.state.tool_events
         )
         context.state.ordinary_guideline_matches.extend(tool_guideline_matches)
 
-        # Re-apply priority filtering now that tool guidelines (which may carry
-        # their own priority) have been injected into the combined match set.
+        # Re-apply full relational resolution now that tool guidelines (which may
+        # carry their own priority) have been injected into the combined match set.
         if tool_guideline_matches:
-            deactivation_reasons: dict[GuidelineId, str] = {}
-            filtered_matches, filtered_journeys = (
-                self._relational_resolver.find_highest_priority_entities(
-                    context.state.ordinary_guideline_matches,
-                    context.state.journeys,
-                    deactivation_reasons,
-                )
+            all_guidelines = [m.guideline for m in context.state.ordinary_guideline_matches]
+            resolver_result = await self._relational_resolver.resolve(
+                usable_guidelines=all_guidelines,
+                matches=context.state.ordinary_guideline_matches,
+                journeys=context.state.journeys,
             )
-            context.state.ordinary_guideline_matches = filtered_matches
-            context.state.journeys = filtered_journeys
+            context.state.ordinary_guideline_matches = list(resolver_result.matches)
+            context.state.journeys = list(resolver_result.journeys)
 
     async def _inject_tool_insights(self, context: EngineContext) -> None:
         """Filter missing and invalid tool parameters jointly by precedence."""

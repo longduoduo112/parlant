@@ -12,8 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from collections import defaultdict
-from dataclasses import dataclass
+from __future__ import annotations
+from collections import defaultdict, deque
+from dataclasses import dataclass, field
+from enum import Enum, auto
 from typing import Optional, Sequence, cast
 
 from parlant.core.common import JSONSerializable
@@ -143,7 +145,6 @@ class RelationalResolver:
 
                     # Step 1: Apply dependencies (filter out matches with unmet dependencies)
                     filtered_by_dependencies = await self._apply_dependencies(
-                        usable_guidelines,
                         current_matches,
                         current_journeys,
                         relationship_cache,
@@ -167,6 +168,14 @@ class RelationalResolver:
                     new_matches = list(prioritization_result.matches) + list(entailed_matches)
                     new_journeys = list(prioritization_result.journeys)
 
+                    # Step 4: Apply numerical priority filtering
+                    # Filter to keep only entities sharing the highest priority value.
+                    new_matches, new_journeys = self.find_highest_priority_entities(
+                        new_matches,
+                        new_journeys,
+                        deactivation_reasons,
+                    )
+
                     # Check if we've reached a stable state
                     if self._matches_equal(new_matches, current_matches) and self._journeys_equal(
                         new_journeys, current_journeys
@@ -182,15 +191,6 @@ class RelationalResolver:
                     self._logger.trace(
                         f"RelationalResolver reached max iterations ({self.MAX_ITERATIONS})"
                     )
-
-                # Step 4: Apply priority filtering
-                # After all relational resolution has converged, filter to keep
-                # only entities sharing the highest priority value.
-                current_matches, current_journeys = self.find_highest_priority_entities(
-                    current_matches,
-                    current_journeys,
-                    deactivation_reasons,
-                )
 
                 # Emit tracer events for final results
                 final_match_ids = {m.guideline.id for m in current_matches}
@@ -265,9 +265,43 @@ class RelationalResolver:
 
         return list(cache[cache_key])
 
+    class _DependencyTargetKind(Enum):
+        """Classifies a resolved dependency target for the topological pass."""
+
+        MATCHED_GUIDELINE = auto()
+        """Target is a specific guideline that was matched. The dependency is
+        satisfied only if that guideline remains in the surviving set."""
+
+        ANY_MATCHED_TAG_MEMBER = auto()
+        """Target is a tag with ANY semantics. The dependency is satisfied if
+        at least one of the tag's matched member guidelines remains in the
+        surviving set."""
+
+        UNMET = auto()
+        """Target could not be resolved at all — either a guideline that was
+        never matched, a journey that is not active, or a tag with no matched
+        members. The dependency is unconditionally failed."""
+
+    @dataclass
+    class _DependencyTarget:
+        """A single resolved dependency of a matched guideline.
+
+        During the first phase of _apply_dependencies, each raw dependency
+        relationship is resolved into one of these targets. They are then
+        used in the topological pass (phase 3) to decide whether a guideline
+        survives: for MATCHED_GUIDELINE the referenced ID must be in the
+        surviving set; for ANY_MATCHED_TAG_MEMBER at least one of the
+        referenced IDs must be; for UNMET the guideline is always removed.
+
+        The guideline_ids field is only populated for MATCHED_GUIDELINE and
+        ANY_MATCHED_TAG_MEMBER — it is empty for UNMET targets.
+        """
+
+        kind: RelationalResolver._DependencyTargetKind
+        guideline_ids: set[GuidelineId] = field(default_factory=set)
+
     async def _apply_dependencies(
         self,
-        usable_guidelines: Sequence[Guideline],
         matches: Sequence[GuidelineMatch],
         journeys: Sequence[Journey],
         cache: dict[
@@ -275,8 +309,7 @@ class RelationalResolver:
         ],
         deactivation_reasons: dict[GuidelineId, str],
     ) -> Sequence[GuidelineMatch]:
-        """Filter out guidelines with unmet dependencies."""
-        # This is the logic from filter_unmet_dependencies in the old implementation
+        """Filter out guidelines with unmet dependencies using topological ordering."""
         matched_guideline_ids = {m.guideline.id for m in matches}
 
         # Build a map of tag → matched guideline IDs for non-persisted guidelines
@@ -285,15 +318,20 @@ class RelationalResolver:
             for tag_id in m.guideline.tags:
                 matched_tag_guidelines[tag_id].add(m.guideline.id)
 
-        result: list[GuidelineMatch] = []
+        # Phase 1: Gather resolved dependencies and build topological graph edges
+        dep_info: dict[GuidelineId, list[RelationalResolver._DependencyTarget]] = {}
+        # Adjacency: dependent → set of matched guideline IDs it must wait for
+        topo_edges: dict[GuidelineId, set[GuidelineId]] = {m.guideline.id: set() for m in matches}
 
         for match in matches:
-            dependencies = await self._get_relationships(
-                cache, RelationshipKind.DEPENDENCY, True, source_id=match.guideline.id
+            gid = match.guideline.id
+
+            relationships = await self._get_relationships(
+                cache, RelationshipKind.DEPENDENCY, True, source_id=gid
             )
 
             if journey_id := self._extract_journey_id_from_guideline(match.guideline):
-                dependencies.extend(
+                relationships.extend(
                     await self._get_relationships(
                         cache,
                         RelationshipKind.DEPENDENCY,
@@ -303,7 +341,7 @@ class RelationalResolver:
                 )
 
             for tag_id in match.guideline.tags:
-                dependencies.extend(
+                relationships.extend(
                     await self._get_relationships(
                         cache,
                         RelationshipKind.DEPENDENCY,
@@ -312,74 +350,108 @@ class RelationalResolver:
                     )
                 )
 
-            if not dependencies:
-                result.append(match)
+            deps: list[RelationalResolver._DependencyTarget] = []
+
+            for rel in relationships:
+                if rel.target.kind == RelationshipEntityKind.GUIDELINE:
+                    target_id = cast(GuidelineId, rel.target.id)
+                    if target_id not in matched_guideline_ids:
+                        deps.append(self._DependencyTarget(kind=self._DependencyTargetKind.UNMET))
+                    else:
+                        deps.append(
+                            self._DependencyTarget(
+                                kind=self._DependencyTargetKind.MATCHED_GUIDELINE,
+                                guideline_ids={target_id},
+                            )
+                        )
+                        if target_id != gid:
+                            topo_edges[gid].add(target_id)
+
+                elif rel.target.kind == RelationshipEntityKind.TAG:
+                    tag_id = cast(TagId, rel.target.id)
+
+                    if journey_id := Tag.extract_journey_id(tag_id):
+                        if not any(j.id == journey_id for j in journeys):
+                            deps.append(
+                                self._DependencyTarget(kind=self._DependencyTargetKind.UNMET)
+                            )
+                        # Journey active — dependency met, no dep entry needed
+                    else:
+                        guidelines_for_tag = await self._guideline_store.list_guidelines(
+                            tags=[tag_id]
+                        )
+                        all_ids = {g.id for g in guidelines_for_tag}
+                        all_ids.update(matched_tag_guidelines.get(tag_id, set()))
+
+                        matched_members = all_ids & matched_guideline_ids
+                        if not matched_members:
+                            deps.append(
+                                self._DependencyTarget(kind=self._DependencyTargetKind.UNMET)
+                            )
+                        else:
+                            deps.append(
+                                self._DependencyTarget(
+                                    kind=self._DependencyTargetKind.ANY_MATCHED_TAG_MEMBER,
+                                    guideline_ids=matched_members,
+                                )
+                            )
+                            for member_id in matched_members:
+                                if member_id != gid:
+                                    topo_edges[gid].add(member_id)
+
+            dep_info[gid] = deps
+
+        # Phase 2: Topological sort (Kahn's algorithm)
+        in_degree: dict[GuidelineId, int] = {gid: 0 for gid in topo_edges}
+
+        reverse_edges: dict[GuidelineId, set[GuidelineId]] = defaultdict(set)
+        for gid, edge_targets in topo_edges.items():
+            for dep_id in edge_targets:
+                if dep_id in in_degree:
+                    in_degree[gid] += 1
+                    reverse_edges[dep_id].add(gid)
+
+        queue: deque[GuidelineId] = deque()
+        for gid, degree in in_degree.items():
+            if degree == 0:
+                queue.append(gid)
+
+        topo_order: list[GuidelineId] = []
+        while queue:
+            gid = queue.popleft()
+            topo_order.append(gid)
+            for dependent in reverse_edges.get(gid, set()):
+                in_degree[dependent] -= 1
+                if in_degree[dependent] == 0:
+                    queue.append(dependent)
+
+        # Phase 3: Process in topological order with progressive elimination
+        surviving: set[GuidelineId] = set(matched_guideline_ids)
+
+        for gid in topo_order:
+            if gid not in surviving:
                 continue
 
-            iterated_guidelines: set[GuidelineId] = set()
-
-            dependent_on_inactive_guidelines = False
-
-            while dependencies:
-                dependency = dependencies.pop()
-
-                if (
-                    dependency.target.kind == RelationshipEntityKind.GUIDELINE
-                    and dependency.target.id not in matched_guideline_ids
-                ):
-                    dependent_on_inactive_guidelines = True
+            for dep in dep_info.get(gid, []):
+                if dep.kind == self._DependencyTargetKind.UNMET:
+                    surviving.discard(gid)
                     break
-
-                if dependency.target.kind == RelationshipEntityKind.TAG:
-                    if journey_id := Tag.extract_journey_id(cast(TagId, dependency.target.id)):
-                        if any(journey.id == journey_id for journey in journeys):
-                            # If the tag is a journey tag and the journey is active,
-                            # then this dependency is met.
-                            continue
-                        else:
-                            dependent_on_inactive_guidelines = True
-                            break
-
-                    guidelines_associated_to_tag = await self._guideline_store.list_guidelines(
-                        tags=[cast(TagId, dependency.target.id)]
-                    )
-
-                    # Merge store results with matched (possibly non-persisted) guidelines
-                    all_guideline_ids_for_tag = {g.id for g in guidelines_associated_to_tag}
-                    all_guideline_ids_for_tag.update(
-                        matched_tag_guidelines.get(cast(TagId, dependency.target.id), set())
-                    )
-
-                    # ANY semantics: at least one tagged member must be matched
-                    any_member_matched = any(
-                        gid in matched_guideline_ids for gid in all_guideline_ids_for_tag
-                    )
-
-                    if not any_member_matched:
-                        dependent_on_inactive_guidelines = True
-                    else:
-                        for gid in all_guideline_ids_for_tag:
-                            if gid in matched_guideline_ids and gid not in iterated_guidelines:
-                                dependencies.extend(
-                                    await self._get_relationships(
-                                        cache, RelationshipKind.DEPENDENCY, True, source_id=gid
-                                    )
-                                )
-
-                    iterated_guidelines.update(all_guideline_ids_for_tag)
-
-                    if dependent_on_inactive_guidelines:
+                elif dep.kind == self._DependencyTargetKind.MATCHED_GUIDELINE:
+                    if not dep.guideline_ids <= surviving:
+                        surviving.discard(gid)
+                        break
+                elif dep.kind == self._DependencyTargetKind.ANY_MATCHED_TAG_MEMBER:
+                    if not (dep.guideline_ids & surviving):
+                        surviving.discard(gid)
                         break
 
-            if not dependent_on_inactive_guidelines:
-                result.append(match)
-            else:
+            if gid not in surviving:
                 self._logger.debug(
-                    f"Skipped: Guideline {match.guideline.id} deactivated due to unmet dependencies"
+                    f"Skipped: Guideline {gid} deactivated due to unmet dependencies"
                 )
-                deactivation_reasons[match.guideline.id] = "Unmet dependencies"
+                deactivation_reasons[gid] = "Unmet dependencies"
 
-        return result
+        return [m for m in matches if m.guideline.id in surviving]
 
     async def _apply_prioritization(
         self,

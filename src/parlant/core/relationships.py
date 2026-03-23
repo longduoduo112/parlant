@@ -351,6 +351,22 @@ class RelationshipDocumentStore(RelationshipStore):
                 id=relationship.id,
             )
 
+            if source.id != target.id and not networkx.is_directed_acyclic_graph(graph):
+                graph.remove_edge(source.id, target.id)
+
+                await self._collection.delete_one(
+                    filters={
+                        "source": {"$eq": source.id_to_string()},
+                        "target": {"$eq": target.id_to_string()},
+                        "kind": {"$eq": kind.value},
+                    },
+                )
+
+                raise ValueError(
+                    f"Circular dependency detected: adding {source.id} → {target.id} "
+                    f"would create a cycle in {kind.value} relationships"
+                )
+
         return relationship
 
     @override
