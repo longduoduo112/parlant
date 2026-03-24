@@ -540,3 +540,25 @@ async def test_that_creating_a_self_dependency_is_allowed(
         target=RelationshipEntity(id=a_id, kind=RelationshipEntityKind.GUIDELINE),
         kind=RelationshipKind.DEPENDENCY,
     )
+
+
+async def test_that_creating_a_cycle_across_dependency_and_dependency_any_raises_an_error(
+    relationship_store: RelationshipStore,
+) -> None:
+    """G1 →(DEPENDENCY)→ G2 →(DEPENDENCY_ANY)→ G1 should raise."""
+    a_id = GuidelineId("a")
+    b_id = GuidelineId("b")
+
+    await relationship_store.create_relationship(
+        source=RelationshipEntity(id=a_id, kind=RelationshipEntityKind.GUIDELINE),
+        target=RelationshipEntity(id=b_id, kind=RelationshipEntityKind.GUIDELINE),
+        kind=RelationshipKind.DEPENDENCY,
+    )
+
+    with pytest.raises(ValueError, match="[Cc]ircular"):
+        await relationship_store.create_relationship(
+            source=RelationshipEntity(id=b_id, kind=RelationshipEntityKind.GUIDELINE),
+            target=RelationshipEntity(id=a_id, kind=RelationshipEntityKind.GUIDELINE),
+            kind=RelationshipKind.DEPENDENCY_ANY,
+            group_id="test-group",
+        )

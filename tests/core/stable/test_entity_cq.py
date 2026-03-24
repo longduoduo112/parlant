@@ -423,7 +423,7 @@ async def test_list_guidelines_dependent_directly_on_journey(
     await relationship_store.create_relationship(
         source=RelationshipEntity(id=guideline1.id, kind=RelationshipEntityKind.GUIDELINE),
         target=RelationshipEntity(
-            id=Tag.for_journey_id(journey.id).id, kind=RelationshipEntityKind.TAG
+            id=Tag.for_journey_id(journey.id).id, kind=RelationshipEntityKind.TAG_ALL
         ),
         kind=RelationshipKind.DEPENDENCY,
     )
@@ -467,7 +467,7 @@ async def test_list_guidelines_dependent_indirectly_on_journey(
     await relationship_store.create_relationship(
         source=RelationshipEntity(id=guideline1.id, kind=RelationshipEntityKind.GUIDELINE),
         target=RelationshipEntity(
-            id=Tag.for_journey_id(journey.id).id, kind=RelationshipEntityKind.TAG
+            id=Tag.for_journey_id(journey.id).id, kind=RelationshipEntityKind.TAG_ALL
         ),
         kind=RelationshipKind.DEPENDENCY,
     )
@@ -480,13 +480,13 @@ async def test_list_guidelines_dependent_indirectly_on_journey(
 
     await relationship_store.create_relationship(
         source=RelationshipEntity(id=guideline3.id, kind=RelationshipEntityKind.GUIDELINE),
-        target=RelationshipEntity(id=tag.id, kind=RelationshipEntityKind.TAG),
+        target=RelationshipEntity(id=tag.id, kind=RelationshipEntityKind.TAG_ALL),
         kind=RelationshipKind.DEPENDENCY,
     )
     await relationship_store.create_relationship(
-        source=RelationshipEntity(id=tag.id, kind=RelationshipEntityKind.TAG),
+        source=RelationshipEntity(id=tag.id, kind=RelationshipEntityKind.TAG_ALL),
         target=RelationshipEntity(
-            id=Tag.for_journey_id(journey.id).id, kind=RelationshipEntityKind.TAG
+            id=Tag.for_journey_id(journey.id).id, kind=RelationshipEntityKind.TAG_ALL
         ),
         kind=RelationshipKind.DEPENDENCY,
     )
@@ -630,7 +630,7 @@ async def test_that_find_guidelines_that_need_reevaluation_finds_guidelines_by_t
     await relationship_store.create_relationship(
         source=RelationshipEntity(
             id=custom_tag_id,
-            kind=RelationshipEntityKind.TAG,
+            kind=RelationshipEntityKind.TAG_ALL,
         ),
         target=RelationshipEntity(
             id=tool_id,

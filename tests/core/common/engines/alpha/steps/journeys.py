@@ -165,7 +165,7 @@ def given_the_journey_called(
                 ),
                 target=RelationshipEntity(
                     id=Tag.for_journey_node_id(node1.id).id,
-                    kind=RelationshipEntityKind.TAG,
+                    kind=RelationshipEntityKind.TAG_ALL,
                 ),
                 kind=RelationshipKind.REEVALUATION,
             )
@@ -325,7 +325,7 @@ def given_the_journey_called(
                 ),
                 target=RelationshipEntity(
                     id=Tag.for_journey_node_id(node5.id).id,
-                    kind=RelationshipEntityKind.TAG,
+                    kind=RelationshipEntityKind.TAG_ALL,
                 ),
                 kind=RelationshipKind.REEVALUATION,
             )
@@ -544,7 +544,7 @@ def given_the_journey_called(
             relationship_store.create_relationship(
                 source=RelationshipEntity(
                     id=Tag.for_journey_node_id(node4.id).id,
-                    kind=RelationshipEntityKind.TAG,
+                    kind=RelationshipEntityKind.TAG_ALL,
                 ),
                 target=RelationshipEntity(
                     id=ToolId("local", tool.name),
@@ -872,7 +872,7 @@ def given_the_journey_called(
             relationship_store.create_relationship(
                 source=RelationshipEntity(
                     id=Tag.for_journey_node_id(node5.id).id,
-                    kind=RelationshipEntityKind.TAG,
+                    kind=RelationshipEntityKind.TAG_ALL,
                 ),
                 target=RelationshipEntity(
                     id=ToolId("local", tool.name),
@@ -1943,7 +1943,7 @@ def given_the_journey_called(
                 ),
                 target=RelationshipEntity(
                     id=Tag.for_journey_node_id(node5.id).id,
-                    kind=RelationshipEntityKind.TAG,
+                    kind=RelationshipEntityKind.TAG_ALL,
                 ),
                 kind=RelationshipKind.REEVALUATION,
             )
@@ -2189,7 +2189,7 @@ def given_the_journey_called(
             relationship_store.create_relationship(
                 source=RelationshipEntity(
                     id=Tag.for_journey_node_id(node4.id).id,
-                    kind=RelationshipEntityKind.TAG,
+                    kind=RelationshipEntityKind.TAG_ALL,
                 ),
                 target=RelationshipEntity(
                     id=ToolId("local", tool.name),
@@ -2239,7 +2239,7 @@ def given_the_journey_called(
             relationship_store.create_relationship(
                 source=RelationshipEntity(
                     id=Tag.for_journey_node_id(node5.id).id,
-                    kind=RelationshipEntityKind.TAG,
+                    kind=RelationshipEntityKind.TAG_ALL,
                 ),
                 target=RelationshipEntity(
                     id=ToolId("local", tool.name),
@@ -2373,7 +2373,7 @@ def given_the_journey_called(
                 ),
                 target=RelationshipEntity(
                     id=Tag.for_journey_node_id(node1.id).id,
-                    kind=RelationshipEntityKind.TAG,
+                    kind=RelationshipEntityKind.TAG_ALL,
                 ),
                 kind=RelationshipKind.REEVALUATION,
             )
@@ -2534,7 +2534,7 @@ def given_the_journey_called(
                 ),
                 target=RelationshipEntity(
                     id=Tag.for_journey_node_id(node_blood.id).id,
-                    kind=RelationshipEntityKind.TAG,
+                    kind=RelationshipEntityKind.TAG_ALL,
                 ),
                 kind=RelationshipKind.REEVALUATION,
             )
@@ -3095,7 +3095,7 @@ def given_the_node_is_tool_running_only(
             relationship_store.create_relationship(
                 source=RelationshipEntity(
                     id=Tag.for_journey_node_id(node.id).id,
-                    kind=RelationshipEntityKind.TAG,
+                    kind=RelationshipEntityKind.TAG_ALL,
                 ),
                 target=RelationshipEntity(
                     id=tool_id,

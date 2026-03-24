@@ -4,9 +4,14 @@ All notable changes to Parlant will be documented here.
 
 ## [Unreleased]
 
+### Added
+
+- Add `AnyOf(tag)` and `AllOf(tag)` modifiers for explicit control over tag dependency semantics in `depend_on()` — `AnyOf` requires at least one tagged member to be active, `AllOf` requires all of them (bare `Tag` defaults to `AllOf`)
+- Add `depend_on_any()` to `Guideline`, `Tag`, and `Journey` for OR dependency relationships — at least one target must be active. Multiple `depend_on_any()` calls create independent OR groups that are AND'd together
+
 ### Changed
 
-- Change tag dependency semantics from ALL to ANY: a dependency on a tag is now satisfied when at least one tagged member (guideline, observation, or journey) is active, rather than requiring all of them
+- Split `RelationshipEntityKind.TAG` into `TAG_ALL` and `TAG_ANY` to support explicit tag dependency semantics at the core level (existing `TAG` entries treated as `TAG_ALL` for backwards compatibility)
 
 ### Fixed
 
