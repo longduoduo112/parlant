@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import uuid
 from collections import defaultdict, deque
 from contextlib import AsyncExitStack
@@ -43,7 +44,7 @@ from rich.progress import (
 )
 from rich.live import Live
 from rich.text import Text
-from types import TracebackType
+from types import ModuleType, TracebackType
 from typing import (
     Any,
     Awaitable,
@@ -5440,6 +5441,16 @@ class Server:
                     )  # type: ignore
                 )
 
+        def get_env_based_module() -> ModuleType | None:
+            if env_module_name := os.getenv("PARLANT_SDK_MODULE"):
+                try:
+                    return importlib.import_module(env_module_name)
+                except ImportError as e:
+                    raise SDKError(
+                        f"Failed to import module '{env_module_name}' specified in PARLANT_SDK_MODULE environment variable."
+                    ) from e
+            return None
+
         async def configure(c: Container) -> Container:
             latest_container = c
 
@@ -5454,6 +5465,10 @@ class Server:
             if self._configure_hooks:
                 hooks = await self._configure_hooks(c[EngineHooks])
                 latest_container[EngineHooks] = hooks
+
+            if env_based_module := get_env_based_module():
+                if configure_module := getattr(env_based_module, "configure_module", None):
+                    latest_container = await configure_module(latest_container.clone())
 
             return latest_container
 
@@ -5496,6 +5511,10 @@ class Server:
 
             if self._initialize:
                 await self._initialize(c)
+
+            if env_based_module := get_env_based_module():
+                if initialize_module := getattr(env_based_module, "initialize_module", None):
+                    await initialize_module(c.clone())
 
         return StartupParameters(
             host=self.host,
