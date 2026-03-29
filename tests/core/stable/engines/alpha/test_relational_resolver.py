@@ -4107,6 +4107,11 @@ async def test_that_multiple_independent_dependencies_must_all_be_met(
     assert_resolutions(result, g1.id, [ResolutionKind.UNMET_DEPENDENCY_ALL])
     assert_resolutions(result, g2.id, [ResolutionKind.NONE])
 
+    # The single resolution should specifically identify T1 as the unmet target
+    g1_res = get_resolutions_by_kind(result, g1.id, ResolutionKind.UNMET_DEPENDENCY_ALL)
+    assert len(g1_res) == 1
+    assert t1.id in g1_res[0].details.target_ids
+
 
 async def test_that_multiple_independent_dependencies_survive_when_all_met(
     container: Container,
