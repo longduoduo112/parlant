@@ -63,17 +63,17 @@ Parlant solves this with [context engineering](https://www.gartner.com/en/articl
 
 Parlant is built around three goals that shape every decision in the framework:
 
-### 1. Maximum control over each customer's experience
+### 1. Maximum control over the conversation experience
 
-Real-world customer interactions are full of nuance — tone, timing, edge cases, regulatory constraints, brand voice. Parlant strives to make every aspect of how the agent speaks and behaves shapeable with precision, rather than left to a language model's biases. The further customization can be pushed, the closer the agent gets to representing your business the way a trained human would.
+Parlant was designed around a simple idea: developers should be able to control the agent's behavior with precision. In customer-facing conversations, small details matter — tone, timing, edge cases, policy constraints, and brand voice. So we chose a design that makes these aspects easily configurable and manageable. That approach adds complexity, but it gives teams tighter control over how the agent behaves in real conversations.
 
 ### 2. Maximum prevention of unwanted behaviors
 
-A customer-facing agent is only useful if you can trust it not to go off the rails: engaging in unwanted topics, making vain guarantees, or claiming that something happened when it didn't. Parlant views misalignment as a central problem: every primitive in the framework is designed to make it structurally harder for the agent to do something it shouldn't, and easier to catch and correct it when it does.
+Parlant treats misalignment as a core design problem. It builds on [our research into model accuracy and consistency](https://arxiv.org/abs/2503.03669#:~:text=We%20present%20Attentive%20Reasoning%20Queries%20%28ARQs%29%2C%20a%20novel,in%20Large%20Language%20Models%20through%20domain-specialized%20reasoning%20blueprints.) so that it is structurally harder for the agent to behave outside its intended boundaries, and easier to detect and correct when it does. Rather than bolting guardrails onto the output, Parlant applies constraints and control points into how your LLMs are used in the first place to produce safe and correct output.
 
-### 3. Fastest possible feedback cycle with business experts
+### 3. Fastest path from business expert to agent behavior
 
-Once an agent is in production, most of the feedback around it is driven by business experts. Parlant seeks to ease and accelerate the process of translating that feedback into agent behavior changes as directly and reliably as possible, so engineering time stays focused on building rather than on relaying every nuance by hand. No prompt rewrites, graph rewiring, or model retraining in the loop.
+Parlant is designed so that those responsible for the agent's conversational experience can shape its behavior directly in a rapid feedback cycle that engineers can support. We focused on a design that lets you express instructions as directly as possible, without any manual rewiring of graphs or model fine-tuning, ensuring that valuable engineering time is only needed for deeper structural changes, not minor behavior adjustments.
 
 ## Getting started
 
