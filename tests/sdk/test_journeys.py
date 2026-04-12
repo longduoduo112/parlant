@@ -274,7 +274,9 @@ class Test_that_journey_state_can_transition_to_a_tool(SDKTest):
         assert state.tools
 
         assert len(state.tools) == 1
-        assert state.tools[0].tool.name == "test_tool"
+        first_tool = state.tools[0]
+        assert isinstance(first_tool, p.ToolEntry)
+        assert first_tool.tool.name == "test_tool"
 
 
 class Test_that_journey_state_can_be_transitioned_with_condition(SDKTest):
