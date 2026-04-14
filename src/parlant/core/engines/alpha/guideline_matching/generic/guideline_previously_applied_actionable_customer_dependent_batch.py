@@ -23,6 +23,7 @@ from parlant.core.common import DefaultBaseModel, JSONSerializable
 from parlant.core.engines.alpha.guideline_matching.common import measure_guideline_matching_batch
 from parlant.core.engines.alpha.guideline_matching.generic.common import (
     GuidelineInternalRepresentation,
+    dump_guideline,
     internal_representation,
 )
 from parlant.core.engines.alpha.guideline_matching.guideline_match import (
@@ -306,10 +307,7 @@ Examples of Guideline Match Evaluations:
 """,
             props={
                 "guidelines_text": guidelines_text,
-                "guidelines": [
-                    {"condition": g.content.condition, "action": g.content.action}
-                    for g in self._guidelines.values()
-                ],
+                "guidelines": [dump_guideline(g) for g in self._guidelines.values()],
             },
             status=SectionStatus.ACTIVE,
         )

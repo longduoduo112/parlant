@@ -25,6 +25,7 @@ from parlant.core.common import DefaultBaseModel, JSONSerializable
 from parlant.core.engines.alpha.guideline_matching.common import measure_response_analysis_batch
 from parlant.core.engines.alpha.guideline_matching.generic.common import (
     GuidelineInternalRepresentation,
+    dump_guideline,
     internal_representation,
 )
 from parlant.core.engines.alpha.guideline_matching.generic.guideline_actionable_batch import (
@@ -379,7 +380,9 @@ Examples of ...:
         builder.add_section(
             name=BuiltInSection.GUIDELINE_DESCRIPTIONS,
             template=self._add_guideline_matches_section(guidelines, guideline_representations),
-            props={},
+            props={
+                "guidelines": [dump_guideline(g) for g in guidelines.values()],
+            },
         )
 
         builder.add_section(

@@ -23,6 +23,7 @@ from typing_extensions import override
 from parlant.core.common import DefaultBaseModel, JSONSerializable
 from parlant.core.engines.alpha.guideline_matching.common import measure_guideline_matching_batch
 from parlant.core.engines.alpha.guideline_matching.generic.common import (
+    dump_guideline,
     internal_representation,
 )
 from parlant.core.engines.alpha.guideline_matching.guideline_match import (
@@ -323,7 +324,7 @@ You will be given:
 1. An ambiguity condition that signals the potential ambiguity when true
 2. A list of related guidelines, each representing a possible path the customer might follow
 
-Evaluate whether the ambiguity condition indeed holds in the current interaction context. 
+Evaluate whether the ambiguity condition indeed holds in the current interaction context.
 If it does, evaluate if there is more than one guideline whose condition can be relevant to the user's inquiry.
 If ambiguity exists (ambiguity condition is true AND multiple guidelines apply):
     - Identify the relevant guidelines that represent the available options. Briefly explain how user's request can be interpreted as relevant for this guideline.
@@ -333,16 +334,16 @@ If ambiguity exists (ambiguity condition is true AND multiple guidelines apply):
 
 On detecting real ambiguity:
 - If the ambiguity is not directly related to the evaluated guideline, or if it is broader than the specific ambiguity condition being assessed, do not flag it as ambiguity.
-- Guidelines often describe very similar requests with subtle differences. If the customer has indicated which option is relevant to them, there is NO ambiguity - even if you think another similar guideline could also apply. 
+- Guidelines often describe very similar requests with subtle differences. If the customer has indicated which option is relevant to them, there is NO ambiguity - even if you think another similar guideline could also apply.
 We don't want to detect ambiguity when the customer has already stated what they want. Trust the customer's stated intent rather than second - guessing whether they might have meant a similar alternative.
 Only disambiguate when the customer's request is genuinely unclear and could reasonably match multiple distinct paths.
     For example:
     If the guidelines include both "Return for refund" and "Return for exchange", and the customer says "I want to return this for a refund", do NOT ask if they meant an exchange instead. The customer has clearly stated their intent.
-- When ambiguity exists, include all plausible guidelines — let the customer choose among all viable options. 
+- When ambiguity exists, include all plausible guidelines — let the customer choose among all viable options.
 - Some guidelines may turn out to be irrelevant based on the interaction. For example, due to earlier parts of the conversation or because the user's status (provided in the interaction history or
 as a context variable) rules them out. If only one or no guidelines remain relevant, no ambiguity exists.
 
-After disambiguation was asked: 
+After disambiguation was asked:
 - If you've already asked for disambiguation from the customer, **pay extra attention** to whether you need to re-ask for clarification or whether the user responded and the ambiguity was already resolved.
 - **Accept brief customer responses as valid clarifications**: Customers often communicate with very short responses (single words or phrases like "return", "replace", "yes", "no"). If the customer's brief
  response clearly indicates their choice among the previously presented options, consider the ambiguity resolved even if their answer is not in complete sentence.
@@ -351,7 +352,7 @@ After disambiguation was asked:
   2. Disambiguation requested, clarification provided (customer has answered) - don't re-disambiguate the same issue (disambiguation_requested = true, customer_resolved=true, is_ambiguous = false)
   3. New ambiguity (different unclear intent emerges) - do disambiguate (is_ambiguous = true)
 
-Focus on the current context: 
+Focus on the current context:
 Base your evaluation on the customer's most recent message. If the customer has changed the subject or moved on to a different topic in their most recent message, do not disambiguate previously unresolved issues.
 Always prioritize the customer's current request and intent over past ambiguities.
 
@@ -391,6 +392,7 @@ Examples of Guidelines Ambiguity Evaluation:
             props={
                 "disambiguation_targets_text": disambiguation_targets_text,
                 "disambiguation_condition": disambiguation_condition_internal.condition,
+                "guidelines": dump_guideline(self._disambiguation_guideline),
             },
             status=SectionStatus.ACTIVE,
         )
