@@ -3,6 +3,9 @@
 All notable changes to Parlant will be documented here.
 
 ## [Unreleased]
+TBD
+
+## [3.3.1] - 2025-04-14
 
 ### Added
 
