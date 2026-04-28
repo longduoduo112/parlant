@@ -43,7 +43,7 @@
 
 > **Looking for an open-source alternative to Ada, Decagon, or Sierra?**
 
-**Parlant streamlines the development and maintenance of enterprise-grade B2C (business-to-consumer) and sensitive B2B interactions that need to be consistent, compliant, and on-brand.**
+**Parlant is production-ready. It streamlines the development and maintenance of enterprise-grade B2C (business-to-consumer) and sensitive B2B interactions that need to be consistent, compliant, on-brand, and comprehensively traceable.**
 
 ## Why Parlant?
 
@@ -58,6 +58,9 @@ Conversational context engineering is hard because real-world interactions are d
 Parlant is an agentic harness offering optimized [context engineering](https://www.gartner.com/en/articles/context-engineering) for conversational use cases: getting the right context, no more and no less, into the prompt at the right time. You define rules, knowledge, and tools once, while the engine narrows the context down in real-time to what's immediately relevant to each turn of the conversation.
 
 <img alt="Parlant Demo" src="https://github.com/emcie-co/parlant/blob/develop/docs/demo.gif?raw=true" width="100%" />
+
+### How is Parlant different from LangGraph or DSPy?
+Parlant focuses on conversational governance and behavioral control and consistency, while LangGraph is ideal for workflow automation, and DSPy is ideal for low-level prompt optimization.
 
 ## Design goals
 
@@ -410,7 +413,7 @@ Drop-in chat component to get a frontend running immediately.
 - **[Parlant vs LangGraph](https://www.parlant.io/blog/parlant-vs-langgraph)** — when to use which
 - **[Parlant vs DSPy](https://www.parlant.io/blog/parlant-vs-dspy)** — different tools for different problems
 
-## Community
+## Community - Get Help with Parlant
 
 - **[Discord](https://discord.gg/duxWqxKk6J)** — ask questions, share what you're building
 - **[GitHub Issues](https://github.com/emcie-co/parlant/issues)** — bug reports and feature requests
