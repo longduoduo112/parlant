@@ -341,11 +341,11 @@ def _nlp_request_report(
         kind=NLP_REQUEST_KIND,
         timestamp=datetime.now(timezone.utc),
         attributes={
-            "schema": schema,
-            "model": "test",
-            "success": success,
-            "latency_ms": latency_ms,
-            "error_class": None,
+            NLPHealthView.ATTR_SCHEMA: schema,
+            NLPHealthView.ATTR_MODEL: "test",
+            NLPHealthView.ATTR_SUCCESS: success,
+            NLPHealthView.ATTR_LATENCY_MS: latency_ms,
+            NLPHealthView.ATTR_ERROR_CLASS: None,
         },
     )
 
@@ -360,11 +360,11 @@ def _nlp_embed_report(
         kind=NLP_EMBED_KIND,
         timestamp=datetime.now(timezone.utc),
         attributes={
-            "schema": embedder,
-            "model": "test",
-            "success": success,
-            "latency_ms": latency_ms,
-            "error_class": None,
+            NLPHealthView.ATTR_SCHEMA: embedder,
+            NLPHealthView.ATTR_MODEL: "test",
+            NLPHealthView.ATTR_SUCCESS: success,
+            NLPHealthView.ATTR_LATENCY_MS: latency_ms,
+            NLPHealthView.ATTR_ERROR_CLASS: None,
         },
     )
 

@@ -26,6 +26,7 @@ from parlant.core.health import (
     NLP_REQUESTS_COUNTER,
     NLP_TOKENS_COUNTER,
     HealthReporter,
+    NLPHealthView,
 )
 from parlant.core.loggers import Logger
 from parlant.core.meter import DurationHistogram, Meter
@@ -238,24 +239,21 @@ class BaseStreamingTextGenerator(StreamingTextGenerator):
         error: BaseException | None,
         usage: UsageInfo | None = None,
     ) -> None:
-        try:
-            self.health_reporter.report(
-                NLP_REQUEST_KIND,
-                {
-                    "schema": "StreamingText",
-                    "model": self.model_name,
-                    "success": success,
-                    "latency_ms": duration_seconds * 1000.0,
-                    "error_class": type(error).__name__ if error is not None else None,
-                },
+        self.health_reporter.report(
+            NLP_REQUEST_KIND,
+            {
+                NLPHealthView.ATTR_SCHEMA: "StreamingText",
+                NLPHealthView.ATTR_MODEL: self.model_name,
+                NLPHealthView.ATTR_SUCCESS: success,
+                NLPHealthView.ATTR_LATENCY_MS: duration_seconds * 1000.0,
+                NLPHealthView.ATTR_ERROR_CLASS: type(error).__name__ if error is not None else None,
+            },
+        )
+        self.health_reporter.increment_counter(NLP_REQUESTS_COUNTER, 1)
+        if usage is not None:
+            self.health_reporter.increment_counter(
+                NLP_TOKENS_COUNTER, usage.input_tokens + usage.output_tokens
             )
-            self.health_reporter.increment_counter(NLP_REQUESTS_COUNTER, 1)
-            if usage is not None:
-                self.health_reporter.increment_counter(
-                    NLP_TOKENS_COUNTER, usage.input_tokens + usage.output_tokens
-                )
-        except Exception:
-            self.logger.debug("Failed to report NLP health for streaming request")
 
 
 # ============================================================================
@@ -395,24 +393,21 @@ class BaseSchematicGenerator(SchematicGenerator[T]):
         error: BaseException | None,
         usage: UsageInfo | None = None,
     ) -> None:
-        try:
-            self.health_reporter.report(
-                NLP_REQUEST_KIND,
-                {
-                    "schema": self.schema.__name__,
-                    "model": self.model_name,
-                    "success": success,
-                    "latency_ms": duration_seconds * 1000.0,
-                    "error_class": type(error).__name__ if error is not None else None,
-                },
+        self.health_reporter.report(
+            NLP_REQUEST_KIND,
+            {
+                NLPHealthView.ATTR_SCHEMA: self.schema.__name__,
+                NLPHealthView.ATTR_MODEL: self.model_name,
+                NLPHealthView.ATTR_SUCCESS: success,
+                NLPHealthView.ATTR_LATENCY_MS: duration_seconds * 1000.0,
+                NLPHealthView.ATTR_ERROR_CLASS: type(error).__name__ if error is not None else None,
+            },
+        )
+        self.health_reporter.increment_counter(NLP_REQUESTS_COUNTER, 1)
+        if usage is not None:
+            self.health_reporter.increment_counter(
+                NLP_TOKENS_COUNTER, usage.input_tokens + usage.output_tokens
             )
-            self.health_reporter.increment_counter(NLP_REQUESTS_COUNTER, 1)
-            if usage is not None:
-                self.health_reporter.increment_counter(
-                    NLP_TOKENS_COUNTER, usage.input_tokens + usage.output_tokens
-                )
-        except Exception:
-            self.logger.debug("Failed to report NLP health for generation request")
 
 
 class FallbackSchematicGenerator(SchematicGenerator[T]):

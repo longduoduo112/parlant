@@ -84,6 +84,13 @@ class NLPHealthView:
     criticality = Criticality.CRITICAL
     kinds: tuple[str, ...] = (NLP_REQUEST_KIND, NLP_EMBED_KIND)
 
+    # Report attribute keys — producers and the renderer share these.
+    ATTR_SCHEMA = "schema"
+    ATTR_MODEL = "model"
+    ATTR_SUCCESS = "success"
+    ATTR_LATENCY_MS = "latency_ms"
+    ATTR_ERROR_CLASS = "error_class"
+
     def __init__(
         self,
         *,
@@ -151,7 +158,7 @@ class NLPHealthView:
     ) -> tuple[dict[str, Any], OverallHealth]:
         groups: dict[str, list[HealthReport]] = {}
         for report in reports:
-            name = str(report.attributes.get("schema", "<unknown>"))
+            name = str(report.attributes.get(self.ATTR_SCHEMA, "<unknown>"))
             groups.setdefault(name, []).append(report)
 
         body: dict[str, Any] = {}
@@ -193,23 +200,24 @@ class NLPHealthView:
         *,
         classify: Any,
     ) -> tuple[dict[str, Any], OverallHealth]:
-        successes = sum(1 for r in reports if bool(r.attributes.get("success")))
+        successes = sum(1 for r in reports if bool(r.attributes.get(self.ATTR_SUCCESS)))
         sample_count = len(reports)
         success_rate = successes / sample_count if sample_count else 1.0
 
         latencies = [
-            float(r.attributes["latency_ms"])
+            float(r.attributes[self.ATTR_LATENCY_MS])
             for r in reports
-            if "latency_ms" in r.attributes and r.attributes["latency_ms"] is not None
+            if self.ATTR_LATENCY_MS in r.attributes
+            and r.attributes[self.ATTR_LATENCY_MS] is not None
         ]
         p50 = _percentile(latencies, 0.5)
         p95 = _percentile(latencies, 0.95)
 
         error_counter: Counter[str] = Counter()
         for r in reports:
-            if r.attributes.get("success"):
+            if r.attributes.get(self.ATTR_SUCCESS):
                 continue
-            error_class = str(r.attributes.get("error_class") or "Unknown")
+            error_class = str(r.attributes.get(self.ATTR_ERROR_CLASS) or "Unknown")
             error_counter[error_class] += 1
         recent_errors = dict(error_counter.most_common(self._recent_errors_top_k))
 

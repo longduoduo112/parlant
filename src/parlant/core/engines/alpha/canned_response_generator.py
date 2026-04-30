@@ -62,6 +62,7 @@ from parlant.core.nlp.generation_info import GenerationInfo
 from parlant.core.engines.alpha.guideline_matching.guideline_match import GuidelineMatch
 from parlant.core.engines.alpha.prompt_builder import PromptBuilder, BuiltInSection
 from parlant.core.glossary import Term
+from parlant.core.health import ENGINE_TTFM_KIND, EngineHealthView, HealthReporter
 from parlant.core.emissions import EmittedEvent, EventEmitter, MessageEventHandle
 from parlant.core.sessions import (
     Event,
@@ -521,6 +522,7 @@ class CannedResponseGenerator(MessageEventComposer):
         message_generator: MessageGenerator,
         entity_queries: EntityQueries,
         no_match_provider: NoMatchResponseProvider,
+        health_reporter: HealthReporter,
         streaming_text_generator: StreamingTextGenerator | None = None,
     ) -> None:
         self._logger = logger
@@ -543,6 +545,7 @@ class CannedResponseGenerator(MessageEventComposer):
         self._no_match_provider = no_match_provider
         self._follow_ups_enabled = True
         self._streaming_text_generator = streaming_text_generator
+        self._health_reporter = health_reporter
 
         self.default_fluid_preamble_examples = default_fluid_preamble_examples
         self.default_fluid_preamble_greeting_responses = default_fluid_preamble_greeting_responses
@@ -1098,10 +1101,13 @@ You will now be given the current state of the interaction to which you must gen
                             metadata=event_metadata,
                         )
                         if not first_message_already_emitted:
-                            await self._hist_ttfm_duration.record(
-                                context.start_of_processing.elapsed * 1000
-                            )
+                            ttfm_ms = context.start_of_processing.elapsed * 1000
+                            await self._hist_ttfm_duration.record(ttfm_ms)
                             self._tracer.add_event("canrep.ttfm")
+                            self._health_reporter.report(
+                                ENGINE_TTFM_KIND,
+                                {EngineHealthView.ATTR_TTFM_MS: ttfm_ms},
+                            )
                             first_message_already_emitted = True
 
                         emitted_events.append(handle.event)
@@ -2023,10 +2029,12 @@ QUICK RECAP (for reference before responding):
                     )
 
                     # Record time to first message
-                    await self._hist_ttfm_duration.record(
-                        context.start_of_processing.elapsed * 1000
-                    )
+                    ttfm_ms = context.start_of_processing.elapsed * 1000
+                    await self._hist_ttfm_duration.record(ttfm_ms)
                     self._tracer.add_event("canrep.streaming.ttfm")
+                    self._health_reporter.report(
+                        ENGINE_TTFM_KIND, {EngineHealthView.ATTR_TTFM_MS: ttfm_ms}
+                    )
                 else:
                     # Update the event with new data
                     handle = await handle.update(

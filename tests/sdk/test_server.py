@@ -379,3 +379,51 @@ class Test_that_healthz_reports_token_and_request_rates_after_message_exchange(S
                     assert block[window] > 0, (
                         f"Expected positive {block_name}[{window}] after a message exchange, got {block}"
                     )
+
+
+class Test_that_healthz_reports_engine_section_after_message_exchange(SDKTest):
+    async def setup(self, server: p.Server) -> None:
+        self.agent = await server.create_agent(
+            name="Engine Health Agent",
+            description="Agent for testing engine health reporting",
+        )
+
+    async def run(self, ctx: Context) -> None:
+        response = await ctx.send_and_receive_message(
+            customer_message="Hello there",
+            recipient=self.agent,
+        )
+        assert len(response) > 0
+
+        async with httpx.AsyncClient() as client:
+            health_response = await client.get(f"http://localhost:{ctx.server.port}/healthz")
+            assert health_response.status_code == 200
+
+            data = health_response.json()
+            assert "engine" in data["checks"], (
+                f"Expected 'engine' section in /healthz, got {data}"
+            )
+
+            engine = data["checks"]["engine"]
+            assert engine["sample_count"] > 0, (
+                f"Expected positive sample_count, got {engine}"
+            )
+            assert engine["success_rate"] == 1.0, (
+                f"Expected success_rate 1.0 after a clean turn, got {engine}"
+            )
+            for field in ("p50_latency_ms", "p95_latency_ms", "p50_ttfm_ms", "p95_ttfm_ms"):
+                assert field in engine, f"Expected '{field}' in engine section, got {engine}"
+                assert engine[field] > 0, (
+                    f"Expected positive {field} after a turn, got {engine}"
+                )
+
+            assert "turns_per_minute" in engine, (
+                f"Expected 'turns_per_minute' in engine section, got {engine}"
+            )
+            for window in ("1m", "5m", "1h", "1d"):
+                assert window in engine["turns_per_minute"], (
+                    f"Expected window '{window}' in turns_per_minute, got {engine['turns_per_minute']}"
+                )
+                assert engine["turns_per_minute"][window] > 0, (
+                    f"Expected positive turns_per_minute[{window}], got {engine['turns_per_minute']}"
+                )

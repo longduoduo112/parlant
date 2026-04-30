@@ -281,3 +281,19 @@ class HealthReporter:
         for kind, buffer in self._buffers.items():
             if kind in self._retention:
                 self._prune(kind, buffer)
+
+
+class NullHealthReporter(HealthReporter):
+    """No-op HealthReporter for contexts that don't need observability.
+
+    Accepts every ``report`` / ``increment_counter`` call regardless of
+    configuration and discards it. Useful in tests that exercise NLP /
+    engine paths without caring about ``/healthz``: it lets the producer
+    code run unmodified while keeping the production reporter strict.
+    """
+
+    def report(self, kind: str, attributes: Mapping[str, Any]) -> None:
+        return None
+
+    def increment_counter(self, name: str, amount: int) -> None:
+        return None

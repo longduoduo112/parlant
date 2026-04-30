@@ -27,10 +27,14 @@ from lagom import Container
 
 from parlant.core.event_loop_monitor import EventLoopMonitor
 from parlant.core.health import (
+    ENGINE_TTFM_KIND,
+    ENGINE_TURN_KIND,
+    ENGINE_TURNS_COUNTER,
     NLP_EMBED_KIND,
     NLP_REQUEST_KIND,
     NLP_REQUESTS_COUNTER,
     NLP_TOKENS_COUNTER,
+    EngineHealthView,
     EventLoopHealthView,
     HealthReporter,
     NLPHealthView,
@@ -105,10 +109,21 @@ def configure_healthz(container: Container) -> None:
     health_reporter.configure_counter(NLP_REQUESTS_COUNTER, retention=timedelta(days=1))
     health_reporter.configure_counter(NLP_TOKENS_COUNTER, retention=timedelta(days=1))
 
+    health_reporter.configure_retention(
+        ENGINE_TURN_KIND,
+        ReportRetention(window=timedelta(minutes=10), max_count=10_000),
+    )
+    health_reporter.configure_retention(
+        ENGINE_TTFM_KIND,
+        ReportRetention(window=timedelta(minutes=10), max_count=10_000),
+    )
+    health_reporter.configure_counter(ENGINE_TURNS_COUNTER, retention=timedelta(days=1))
+
     health_reporter.register_view(
         NLPHealthView(
             health_reporter=health_reporter,
             schema_thresholds=DEFAULT_NLP_SCHEMA_THRESHOLDS,
         )
     )
+    health_reporter.register_view(EngineHealthView(health_reporter=health_reporter))
     health_reporter.register_view(EventLoopHealthView(container[EventLoopMonitor]))

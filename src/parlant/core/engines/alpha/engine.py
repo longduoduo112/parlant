@@ -64,6 +64,12 @@ from parlant.core.engines.alpha.message_event_composer import (
 )
 from parlant.core.guidelines import Guideline, GuidelineId, GuidelineContent
 from parlant.core.glossary import Term
+from parlant.core.health import (
+    ENGINE_TURN_KIND,
+    ENGINE_TURNS_COUNTER,
+    EngineHealthView,
+    HealthReporter,
+)
 from parlant.core.journey_guideline_projection import (
     extract_node_id_from_journey_node_guideline_id,
 )
@@ -141,6 +147,7 @@ class AlphaEngine(Engine):
         logger: Logger,
         tracer: Tracer,
         meter: Meter,
+        health_reporter: HealthReporter,
         entity_queries: EntityQueries,
         entity_commands: EntityCommands,
         guideline_matcher: GuidelineMatcher,
@@ -155,6 +162,7 @@ class AlphaEngine(Engine):
         self._logger = logger
         self._tracer = tracer
         self._meter = meter
+        self._health_reporter = health_reporter
 
         self._entity_queries = entity_queries
         self._entity_commands = entity_commands
@@ -192,10 +200,13 @@ class AlphaEngine(Engine):
         if loaded_context.session.mode == "manual":
             return True
 
+        start = async_utils.Stopwatch.start()
+
         try:
             with self._tracer.span("process", {"session_id": context.session_id}):
                 async with self._hist_engine_process_duration.measure():
                     await self._do_process(loaded_context)
+            self._report_turn_health(start.elapsed, success=True, error=None)
             return True
         except asyncio.CancelledError:
             return False
@@ -207,10 +218,30 @@ class AlphaEngine(Engine):
             if await self._hooks.call_on_error(loaded_context, exc):
                 await self._emit_error_event(loaded_context, formatted_exception)
 
+            self._report_turn_health(start.elapsed, success=False, error=exc)
             return False
         except BaseException as exc:
             self._logger.critical(f"Critical processing error: {traceback.format_exception(exc)}")
             raise
+
+    def _report_turn_health(
+        self,
+        duration_seconds: float,
+        *,
+        success: bool,
+        error: BaseException | None,
+    ) -> None:
+        self._health_reporter.report(
+            ENGINE_TURN_KIND,
+            {
+                EngineHealthView.ATTR_SUCCESS: success,
+                EngineHealthView.ATTR_LATENCY_MS: duration_seconds * 1000.0,
+                EngineHealthView.ATTR_ERROR_CLASS: (
+                    type(error).__name__ if error is not None else None
+                ),
+            },
+        )
+        self._health_reporter.increment_counter(ENGINE_TURNS_COUNTER, 1)
 
     @override
     async def utter(
