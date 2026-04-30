@@ -21,10 +21,14 @@ from parlant.core.health import (
     Criticality,
     HealthReport,
     HealthReporter,
+    NLP_EMBED_KIND,
+    NLP_REQUEST_KIND,
+    NLPHealthView,
     OverallHealth,
     ReportRetention,
     ViewSnapshot,
 )
+from parlant.core.health.nlp_view import SchemaThresholds
 from parlant.core.health.reporter import RollingCounter
 
 
@@ -325,3 +329,114 @@ def test_that_incrementing_an_unconfigured_counter_raises() -> None:
     except Exception as e:  # noqa: BLE001
         raised = type(e)
     assert raised is not None
+
+
+def _nlp_request_report(
+    schema: str,
+    *,
+    success: bool = True,
+    latency_ms: float = 10.0,
+) -> HealthReport:
+    return HealthReport(
+        kind=NLP_REQUEST_KIND,
+        timestamp=datetime.now(timezone.utc),
+        attributes={
+            "schema": schema,
+            "model": "test",
+            "success": success,
+            "latency_ms": latency_ms,
+            "error_class": None,
+        },
+    )
+
+
+def _nlp_embed_report(
+    embedder: str,
+    *,
+    success: bool = True,
+    latency_ms: float = 5.0,
+) -> HealthReport:
+    return HealthReport(
+        kind=NLP_EMBED_KIND,
+        timestamp=datetime.now(timezone.utc),
+        attributes={
+            "schema": embedder,
+            "model": "test",
+            "success": success,
+            "latency_ms": latency_ms,
+            "error_class": None,
+        },
+    )
+
+
+def test_that_nlp_view_separates_embedder_reports_from_schemas() -> None:
+    view = NLPHealthView()
+
+    snapshot = view.render(
+        {
+            NLP_REQUEST_KIND: [_nlp_request_report("MySchema")],
+            NLP_EMBED_KIND: [_nlp_embed_report("MyEmbedder")],
+        }
+    )
+
+    assert "schemas" in snapshot.body
+    assert "embedders" in snapshot.body
+    assert "MySchema" in snapshot.body["schemas"]
+    assert "MyEmbedder" in snapshot.body["embedders"]
+    assert "MyEmbedder" not in snapshot.body["schemas"]
+    assert "MySchema" not in snapshot.body["embedders"]
+
+
+def test_that_nlp_view_uses_per_schema_p95_thresholds_when_configured() -> None:
+    view = NLPHealthView(
+        schema_thresholds={
+            "FastSchema": SchemaThresholds(
+                degraded_p95_ms=100.0,
+                unhealthy_p95_ms=300.0,
+            ),
+        }
+    )
+
+    # Latencies whose p95 exceeds the per-schema 100ms degraded threshold
+    # but stays below the 300ms unhealthy threshold.
+    reports = [_nlp_request_report("FastSchema", latency_ms=ms) for ms in [10, 20, 30, 40, 200]]
+
+    snapshot = view.render({NLP_REQUEST_KIND: reports, NLP_EMBED_KIND: []})
+
+    assert snapshot.body["schemas"]["FastSchema"]["status"] == "degraded"
+
+
+def test_that_nlp_view_uses_per_schema_p50_thresholds_when_configured() -> None:
+    view = NLPHealthView(
+        schema_thresholds={
+            "ChattySchema": SchemaThresholds(
+                degraded_p50_ms=50.0,
+                unhealthy_p50_ms=200.0,
+            ),
+        }
+    )
+
+    # Median latency = 75ms, which crosses the per-schema 50ms p50-degraded threshold.
+    reports = [_nlp_request_report("ChattySchema", latency_ms=ms) for ms in [70, 75, 80]]
+
+    snapshot = view.render({NLP_REQUEST_KIND: reports, NLP_EMBED_KIND: []})
+
+    assert snapshot.body["schemas"]["ChattySchema"]["status"] == "degraded"
+
+
+def test_that_nlp_view_falls_back_to_default_thresholds_for_unconfigured_schemas() -> None:
+    view = NLPHealthView(
+        degraded_p95_ms=10_000.0,
+        unhealthy_p95_ms=20_000.0,
+        schema_thresholds={
+            "ConfiguredSchema": SchemaThresholds(degraded_p95_ms=50.0, unhealthy_p95_ms=100.0),
+        },
+    )
+
+    # 1500ms p95 is well below the 10s default degraded threshold,
+    # so an unconfigured schema should remain healthy.
+    reports = [_nlp_request_report("UnconfiguredSchema", latency_ms=ms) for ms in [100, 200, 1500]]
+
+    snapshot = view.render({NLP_REQUEST_KIND: reports, NLP_EMBED_KIND: []})
+
+    assert snapshot.body["schemas"]["UnconfiguredSchema"]["status"] == "healthy"

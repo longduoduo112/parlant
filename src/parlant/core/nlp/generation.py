@@ -161,6 +161,7 @@ class BaseStreamingTextGenerator(StreamingTextGenerator):
 
         async def wrapped_stream() -> AsyncIterator[str | None]:
             nonlocal stream_complete, duration, usage_getter
+            ttft_seconds: float | None = None
 
             try:
                 self.tracer.add_event(
@@ -173,6 +174,8 @@ class BaseStreamingTextGenerator(StreamingTextGenerator):
                 inner_stream, usage_getter = await self.do_generate(prompt, hints)
 
                 async for chunk in inner_stream:
+                    if ttft_seconds is None and chunk is not None:
+                        ttft_seconds = start.elapsed
                     yield chunk
 
                 duration = start.elapsed
@@ -190,7 +193,15 @@ class BaseStreamingTextGenerator(StreamingTextGenerator):
                     stream_usage = usage_getter() if usage_getter is not None else None
                 except Exception:
                     stream_usage = None
-                self._report_health(duration, success=True, error=None, usage=stream_usage)
+                # Health latency tracks time-to-first-token rather than end-to-end:
+                # for streaming, TTFT is the user-perceived latency that matters.
+                # Fall back to total duration if no chunk was ever produced.
+                self._report_health(
+                    ttft_seconds if ttft_seconds is not None else duration,
+                    success=True,
+                    error=None,
+                    usage=stream_usage,
+                )
             except Exception as exc:
                 duration = start.elapsed
                 self.tracer.add_event(

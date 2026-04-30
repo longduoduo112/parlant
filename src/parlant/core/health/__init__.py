@@ -19,6 +19,7 @@ from parlant.core.health.nlp_view import (
     NLP_REQUESTS_COUNTER,
     NLP_TOKENS_COUNTER,
     NLPHealthView,
+    SchemaThresholds,
 )
 from parlant.core.health.reporter import (
     Criticality,
@@ -45,5 +46,6 @@ __all__ = [
     "OverallHealth",
     "ReportRetention",
     "RollingCounter",
+    "SchemaThresholds",
     "ViewSnapshot",
 ]

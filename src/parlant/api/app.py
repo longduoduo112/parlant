@@ -31,6 +31,7 @@ from starlette.routing import Match
 from lagom import Container
 
 from parlant.adapters.loggers.websocket import WebSocketLogger
+from parlant.api.health import configure_healthz
 from parlant.core.health import HealthReporter
 from parlant.api import agents, capabilities
 from parlant.api import evaluations
@@ -121,6 +122,7 @@ async def create_api_app(
         description="HTTP Request Duration",
     )
 
+    configure_healthz(container)
     health_reporter = container[HealthReporter]
 
     api_app = FastAPI(
