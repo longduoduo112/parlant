@@ -334,8 +334,31 @@ class NLPServices:
     """A collection of static methods to create built-in NLPService instances for the SDK."""
 
     @staticmethod
+    def parlant_cloud(container: Container) -> NLPService:
+        """Creates a Parlant Cloud NLPService instance using the provided container."""
+        from parlant.adapters.nlp.parlant_cloud_service import ParlantCloudService
+
+        if error := ParlantCloudService.verify_environment():
+            raise NLPServiceConfigurationError(error)
+
+        return ParlantCloudService(
+            container[Logger],
+            container[Tracer],
+            container[Meter],
+            container[HealthReporter],
+            container[AgentStore],
+            container[GuidelineStore],
+            container[JourneyStore],
+            container[RelationshipStore],
+            container[GlossaryStore],
+            container[ContextVariableStore],
+            container[CannedResponseStore],
+            container[ServiceRegistry],
+        )
+
+    @staticmethod
     def emcie(container: Container) -> NLPService:
-        """Creates an Azure NLPService instance using the provided container."""
+        """Creates an Emcie NLPService instance using the provided container."""
         from parlant.adapters.nlp.emcie_service import EmcieService
 
         if error := EmcieService.verify_environment():
@@ -5460,8 +5483,6 @@ class Server:
 
     def _get_startup_params(self) -> StartupParameters:
         async def override_stores_with_transient_versions(c: Callable[[], Container]) -> None:
-            c()[NLPService] = self._nlp_service_func(c())
-
             for interface, implementation in [
                 (AgentStore, AgentDocumentStore),
                 (TagStore, TagDocumentStore),
@@ -5654,6 +5675,8 @@ class Server:
             if env_based_module := get_env_based_module():
                 if module_func := getattr(env_based_module, "configure_container", None):
                     latest_container = await module_func(latest_container.clone())
+
+            latest_container[NLPService] = self._nlp_service_func(latest_container)
 
             return latest_container
 
