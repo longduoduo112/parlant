@@ -90,6 +90,7 @@ class GuidelineModule:
         condition: str,
         action: str | None,
         description: str | None,
+        title: str | None,
         criticality: Criticality | None,
         metadata: Mapping[str, JSONSerializable] | None,
         enabled: bool | None,
@@ -110,6 +111,7 @@ class GuidelineModule:
             condition=condition,
             action=action,
             description=description,
+            title=title,
             criticality=criticality,
             metadata=metadata or {},
             enabled=enabled or True,
@@ -146,6 +148,7 @@ class GuidelineModule:
         condition: str | None,
         action: str | None,
         description: str | None,
+        title: str | None,
         criticality: Criticality | None,
         tool_associations: GuidelineToolAssociationUpdateParams | None,
         enabled: bool | None,
@@ -161,6 +164,7 @@ class GuidelineModule:
             condition
             or action
             or description is not None
+            or title is not None
             or criticality is not None
             or enabled is not None
             or composition_mode is not None
@@ -173,6 +177,8 @@ class GuidelineModule:
                 update_params["action"] = action
             if description is not None:
                 update_params["description"] = description
+            if title is not None:
+                update_params["title"] = title
             if criticality is not None:
                 update_params["criticality"] = criticality
             if enabled is not None:

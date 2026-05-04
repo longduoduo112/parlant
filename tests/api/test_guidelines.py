@@ -87,6 +87,48 @@ async def test_that_a_guideline_can_be_created(
     assert guideline["metadata"] == {"key1": "value1", "key2": "value2"}
 
 
+async def test_that_a_guideline_can_be_created_with_a_title(
+    async_client: httpx.AsyncClient,
+) -> None:
+    response = await async_client.post(
+        "/guidelines",
+        json={
+            "condition": "the customer asks about pricing",
+            "action": "provide current pricing information",
+            "title": "Pricing inquiries",
+        },
+    )
+
+    assert response.status_code == status.HTTP_201_CREATED
+
+    guideline = response.json()
+    assert guideline["title"] == "Pricing inquiries"
+
+
+async def test_that_a_guideline_title_can_be_updated(
+    async_client: httpx.AsyncClient,
+    container: Container,
+) -> None:
+    guideline_store = container[GuidelineStore]
+
+    guideline = await guideline_store.create_guideline(
+        condition="the customer asks about the weather",
+        action="provide the current weather update",
+        title="Old title",
+    )
+
+    response = await async_client.patch(
+        f"/guidelines/{guideline.id}",
+        json={"title": "Weather inquiries"},
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    updated_guideline = response.json()["guideline"]
+
+    assert updated_guideline["id"] == guideline.id
+    assert updated_guideline["title"] == "Weather inquiries"
+
+
 async def test_that_a_guideline_can_be_created_without_an_action(
     async_client: httpx.AsyncClient,
 ) -> None:

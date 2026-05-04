@@ -1358,3 +1358,21 @@ class Test_that_guideline_depend_on_any_activates_when_one_of_two_guidelines_mat
         assert "pepsi" in response.lower(), (
             f"Expected 'pepsi' in response (depend_on_any: g2 matched) but got: {response}"
         )
+
+
+class Test_that_observation_can_be_created_with_a_title(SDKTest):
+    async def setup(self, server: p.Server) -> None:
+        self.agent = await server.create_agent(
+            name="Title Agent",
+            description="Agent for testing guideline titles",
+        )
+
+        self.observation = await self.agent.create_observation(
+            condition="the customer asks about the weather",
+            title="Weather inquiries",
+        )
+
+    async def run(self, ctx: Context) -> None:
+        store = ctx.container[GuidelineStore]
+        stored = await store.read_guideline(self.observation.id)
+        assert stored.title == "Weather inquiries"
